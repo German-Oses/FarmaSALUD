@@ -1,0 +1,2510 @@
+#include <stdio.h>      // Entrada/salida estándar (printf, scanf, etc.)
+#include <string.h>     // Funciones para manipulación de cadenas (strcpy, strcmp, etc.)#
+#include <stdlib.h>  // Funciones generales (malloc, free, rand, etc.)
+#include <time.h>       // Funciones para trabajar con fechas y horas (time, localtime, etc.)
+
+
+
+struct FarmaSalud // Estructura principal que representa la cadena de farmacias FarmaSalud
+{
+    struct Sucursales *headSucursales; //Puntero al inicio de la lista enlazada de sucursales
+    struct Productos *headTotalProductos; //Puntero al inicio de la lista enlazada de Productos Globales
+};
+
+
+
+/*
+ * Estructura De datos que representa una sucursal de la cadena de farmacias Farmasalud.
+ * Almacena información sobre la ubicación, ventas, inventario y stock de productos de la sucursal.
+ *
+ */
+struct Sucursales
+{
+    int ID;                                 // Identificador único De la Sucursal
+    char *direccion;                        // Direccion donde se encuentra la sucursal
+    char *comuna;                           // Comuna donde se encuentra la sucursal
+    char *region;                           // Region donde se encuentra la sucursal
+    struct Ventas *boletas;                 // Puntero a la lista enlazada de ventas (boletas)
+    struct stockProductos *headStocks;      // Puntero a la lista enlazada de Stocks de los productos
+    struct NodoABB *inventario;             // Puntero al ABB(árbol binario de búsqueda) de productos del inventario
+    struct Sucursales *ant,*sig;            // Puntero a la sucursal anterior y a la siguiente en la lista doblemente enlazada
+};
+
+
+
+/*
+ * Estructura de datos que representa un producto vendido en una boleta.
+ * Almacena información sobre el producto, la cantidad vendida y el monto total del producto en la venta.
+ */
+struct productosVendidos
+{
+    struct infoProducto *producto;           // Puntero a la Información Del Producto Vendido
+    int cantidadVendida;                     // Cantidad de unidades Vendidas del Producto
+    int montoProducto;                       // Monto Total de la cantidad de unidades vendidas del Producto
+    struct productosVendidos *sig;           // Puntero al siguiente Producto vendido de la boleta
+};
+
+
+
+/*
+ * Estructura de datos que representa una boleta de una sucursal.
+ * Almacena la información sobre la direccion de la sucursal, los productos vendidos, el monto total de la boleta
+ * El Número de boleta , la fecha de la compra y un puntero a la siguiente boleta de la sucursal
+ */
+struct Ventas
+{
+    char *direccion;                            // Direccíon donde se realizó la venta
+    struct productosVendidos *vendidos;         // Puntero al inicio de la lista enlazada de productos vendidos en esta boleta
+    int montoTotal;                             // Monto total de la venta
+    int numeroBoleta[1];                        // Array de un elemento para el número de boleta
+    char *fecha;                                // Fecha Cuando se realizó la compra
+    struct Ventas *sig;                         // Puntero a la siguiente boleta de la sucursal en la lista enlazada
+};
+
+
+/*
+ * Estructura de datos que representa un nodo en la lista enlazada de productos.
+ * Almacena información sobre el producto y un puntero al siguiente nodo de la lista.
+ */
+struct Productos
+{
+    struct infoProducto *producto;         // Puntero a la información del producto
+    struct Productos *sig;                 // Puntero al siguiente nodo en la lista enlazada de productos
+};
+
+
+
+
+/*
+ * Estructura de datos que representa un nodo en el árbol binario de búsqueda (ABB) de productos.
+ * Almacena información sobre el producto y punteros a los nodos izquierdo y derecho del árbol.
+ */
+struct NodoABB
+{
+    struct infoProducto *producto;         // Puntero a la información del producto
+    struct NodoABB *izq;                   // Puntero al nodo izquierdo en el árbol binario de búsqueda
+    struct NodoABB *der;                   // Puntero al nodo derecho en el árbol binario de búsqueda
+};
+
+
+
+/*
+ * Estructura de datos que representa el control de lotes de un producto.
+ * Almacena información sobre el lote, la cantidad disponible, la fecha de vencimiento,
+ * y un puntero al siguiente nodo en la lista enlazada de lotes.
+ */
+struct controlLote
+{
+    char *lote;                            // Lote del producto
+    int cantidadDisponible;                // Cantidad disponible del lote
+    char *fechaVencimiento;                // Fecha de vencimiento del lote
+    struct controlLote *sig;               // Puntero al siguiente nodo en la lista enlazada de lotes
+};
+
+
+
+/*
+ * Estructura de datos que representa la información de un producto.
+ * Almacena información detallada sobre el producto, incluyendo código, nombre,
+ * descripción, categoría, proveedor, lote, costo, fecha de vencimiento y si necesita receta.
+ */
+struct infoProducto
+{
+    char *codigo;                          // Código del producto
+    char *nombre;                          // Nombre del producto
+    char *descripcion;                     // Descripción del producto
+    char *categoria;                       // Categoría del producto
+    char *proveedor;                       // Proveedor del producto
+    char *lote;                            // Lote del producto
+    int costo;                             // Costo del producto
+    char *fechaVencimiento;                // Fecha de vencimiento del producto
+    int recetaSN;                          // Indica si el producto necesita receta (1: Sí, 2: No)
+};
+
+
+
+/*
+ * Estructura de datos que representa el stock de productos en una sucursal.
+ * Almacena información sobre el código del medicamento, la cantidad disponible,
+ * los lotes del producto y un puntero al siguiente nodo en la lista enlazada de stock.
+ */
+struct stockProductos
+{
+    char *codigoMedicamento;               // Código del medicamento
+    int cantidadDisponible;                // Cantidad disponible del medicamento
+    struct controlLote *lotesProducto;     // Puntero a la lista enlazada de lotes del producto
+    struct stockProductos *sig;            // Puntero al siguiente nodo en la lista enlazada de stock
+};
+
+
+
+/*
+ *  Función que crea un nuevo nodo para un arbol binario de búsqueda (ABB)
+ * Parametros:
+ *      - Puntero a la información del producto que se almacenará en el nodo.
+ *  Retorna:
+ *      - Puntero al nodo creado
+ */
+struct  NodoABB *crearNodoABB (struct infoProducto *producto)
+{
+    //Asignar Memoria Para el nuevo nodo
+    struct NodoABB *nuevoNodo = (struct NodoABB*)malloc(sizeof(struct NodoABB));
+
+    // Verifica si la asignacion de memoria fue exitosa
+
+    if(nuevoNodo == NULL)
+    {
+        perror("Error al asignar memoria para el nuevo nodo");
+        exit(EXIT_FAILURE);
+    }
+
+    // Inicializa la información del nodo con la del producto
+    nuevoNodo->producto = producto;
+
+    //inicializa los punteros a la izquierda y a la derecha nulos
+    nuevoNodo->izq = nuevoNodo->der = NULL;
+
+
+
+    return nuevoNodo;
+}
+
+
+
+/*
+ * Inserta un nuevo producto en el inventario representado por un árbol binario de búsqueda (ABB).
+ * Esta Función Es Recursiva
+ * Parámetros:
+ *   - nodo: Puntero al nodo actual del árbol.
+ *   - producto: Puntero a la información del producto que se va a insertar.
+ *
+ * Retorna:
+ *   - Puntero al nodo raíz del árbol después de la inserción.
+ */
+struct  NodoABB *insertarProductoInventario(struct NodoABB *nodo , struct infoProducto *producto)
+{
+    // Si el nodo es NULL , crea un nuevo nodo con la información del producto y lo retorna como raiz del árbol
+    if (nodo == NULL)
+    {
+        return crearNodoABB(producto);
+    }
+
+    // Si el codigo del Producto es menor al codigo del producto del nodo actual, se inserta en el subárbol izquierdo
+    if(strcmp(producto->codigo,nodo->producto->codigo) < 0)
+    {
+        nodo->izq = insertarProductoInventario(nodo->izq,producto);
+    }
+    else
+    {
+        // Sí el codigo del Producto es mayor al codigo del producto del nodo actual, se inserta en el subárbol derecho
+        if(strcmp(producto->codigo , nodo->producto->codigo) > 0)
+        {
+            nodo->der = insertarProductoInventario(nodo->der,producto);
+        }
+    }
+
+    return  nodo; // retorna el Nodo Actualizado después de la inserción
+
+}
+
+
+
+/*
+ * Busca un producto en el inventario representado por un árbol binario de búsqueda (ABB).
+ * Esta función es recursiva.
+ * Parámetros:
+ *   - Puntero a la raíz del árbol.
+ *   - Código del producto que se está buscando.
+ *   *
+ * Retorna:
+ *   - Puntero a la información del producto si se encuentra, NULL si no se encuentra.
+ */
+struct infoProducto *buscarProductoEnInventario(struct NodoABB *raiz,char *codigoProducto)
+{
+    // Si la raiz es NULL , el producto no está en el inventario
+    if(raiz == NULL)
+    {
+        return NULL;
+    }
+
+    // Si el codigo de la raiz es igual al código buscado retorna la información del producto
+    if(strcmp(codigoProducto,raiz->producto->codigo)== 0)
+    {
+        return raiz->producto;
+    }
+    else
+        //Si el codigo buscado es menor que el codigo del nodo, se busca en el subárbol izquierdo
+    if(strcmp(codigoProducto,raiz->producto->codigo) < 0)
+        return buscarProductoEnInventario(raiz->izq,codigoProducto);
+
+    else
+        //Si el codigo Buscado es mayor que el codigo del nodo, se busca en el subárbol derecho
+    if(strcmp(codigoProducto,raiz->producto->codigo) > 0)
+        return buscarProductoEnInventario(raiz->der,codigoProducto);
+
+}
+
+
+/*
+ * Busca el nodo más pequeño  en un árbol binario de búsqueda (ABB).
+ * Parámetros:
+ *   - Puntero al nodo raíz del árbol (o subárbol).
+ * Retorna:
+ *   - Puntero al nodo que contiene el valor mínimo en el árbol (o subárbol).
+ */
+struct NodoABB *buscarMinimo(struct NodoABB *nodo)
+{
+    // Itera hacia la izquierda hasta que no haya más nodos a la izquierda
+    while (nodo->izq != NULL)
+    {
+        nodo = nodo->izq;
+    }
+    // Retorna el nodo que contiene el valor mínimo
+    return nodo;
+}
+
+
+
+/*
+ * Elimina un nodo del árbol binario de búsqueda (ABB) con el código de producto especificado.
+ * Parámetros:
+ *   - Puntero al nodo actual del árbol.
+ *   - Código del producto que se va a eliminar.
+ * Retorna:
+ *   - Puntero al nodo raíz del árbol después de la eliminación.
+ */
+struct NodoABB *eliminarNodo(struct NodoABB *nodo, char *codigoProducto)
+{
+    // Si el nodo actual es NULL, no se puede realizar la eliminación
+    if (nodo == NULL)
+    {
+        return nodo;
+    }
+
+    // Si el código del producto a eliminar es menor que el código del producto en el nodo actual, buscar en el subárbol izquierdo
+    if (strcmp(nodo->producto->codigo, codigoProducto) < 0)
+    {
+        nodo->izq = eliminarNodo(nodo->izq, codigoProducto);
+    }
+    else if (strcmp(nodo->producto->codigo, codigoProducto) > 0)
+    {
+        // Si el código del producto a eliminar es mayor que el código del producto en el nodo actual, buscar en el subárbol derecho
+        nodo->der = eliminarNodo(nodo->der, codigoProducto);
+    }
+    else
+    {
+        // Si el nodo actual contiene el código de producto a eliminar
+
+        // Caso 1: El nodo no tiene hijo izquierdo
+        if (nodo->izq == NULL)
+        {
+            struct NodoABB *temp = nodo->der;
+            free(nodo);
+            return temp;
+        }
+            // Caso 2: El nodo no tiene hijo derecho
+        else if (nodo->der == NULL)
+        {
+            struct NodoABB *temp = nodo->izq;
+            free(nodo);
+            return temp;
+        }
+
+        // Caso 3: El nodo tiene dos hijos
+        // Se encuentra el sucesor inmediato (el mínimo) en el subárbol derecho
+        struct NodoABB *temp = buscarMinimo(nodo->der);
+
+        // Se copia el valor del sucesor al nodo actual
+        nodo->producto = temp->producto;
+
+        // Se elimina el sucesor inmediato del subárbol derecho
+        nodo->der = eliminarNodo(nodo->der, temp->producto->codigo);
+    }
+
+    return nodo;
+}
+
+
+/*
+ * Función que busca y elimina un producto del inventario (ABB)
+ * Parámetros:
+ * - Puntero a puntero a la raíz del árbol que representa el inventario.
+ * - Código del producto que se desea buscar y eliminar.
+ */
+void buscarYEliminarEnInventario(struct NodoABB **raiz, char *codigoBuscado)
+{
+    // Busca el producto en el inventario
+    if (buscarProductoEnInventario(*raiz, codigoBuscado) != NULL)
+    {
+        // Si se encuentra el producto, se elimina del inventario y se actualiza la raíz si es necesario
+        *raiz = eliminarNodo(*raiz, codigoBuscado);
+        printf("Producto con código %s eliminado del inventario.\n", codigoBuscado);
+    }
+    else
+    {
+        // Si el producto no se encuentra en el inventario, se muestra un mensaje
+        printf("Producto con código %s no encontrado en el inventario.\n", codigoBuscado);
+    }
+}
+
+
+
+/*
+ * Función que busca una sucursal por su ID en una lista enlazada de sucursales.
+ * Parámetros:
+ * - Puntero al primer nodo de la lista enlazada de sucursales.
+ * - ID de la sucursal que se desea buscar.
+ * Retorna:
+ * - Puntero al nodo de la sucursal encontrada, o NULL si no se encuentra la sucursal con el id especificado.
+ */
+struct Sucursales *buscarSucursal(struct Sucursales *headSucursales, int idSucursalBuscado)
+{
+    struct Sucursales *rec;
+
+    // Si la lista de sucursales está vacía, devuelve NULL
+    if (headSucursales == NULL)
+    {
+        return NULL;
+    }
+
+    // Comprueba si el ID de la primera sucursal coincide con el ID buscado
+    if (headSucursales->ID == idSucursalBuscado)
+    {
+        return headSucursales;
+    }
+
+    // Inicia un puntero de recorrido en el primer nodo de la lista
+    rec = headSucursales;
+
+    // Itera sobre la lista hasta encontrar la sucursal con el ID buscado o llegar al final de la lista
+    while (rec != NULL)
+    {
+        // Comprueba si el ID de la sucursal actual coincide con el ID buscado
+        if (rec->ID == idSucursalBuscado)
+        {
+            return rec; // Devuelve la sucursal encontrada
+        }
+
+        // Avanza al siguiente nodo de la lista
+        rec = rec->sig;
+    }
+
+    // Si no se encuentra ninguna sucursal con el ID buscado devuelve NULL
+    return NULL;
+}
+
+
+
+/*
+ * Función que encuentra y muestra el producto más vendido en un mes específico en todas las sucursales de la cadena de FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura que representa la cadena de farmacias.
+ */
+void productoMasVendidoMes(struct FarmaSalud *farmaSalud)
+{
+    int mesObjetivo;
+
+    // Solicita al usuario ingresar el número del mes objetivo
+    printf("Ingrese el numero del mes (1-12) para encontrar el producto más vendido: ");
+    scanf("%d", &mesObjetivo);
+
+    // Verifica si el mes ingresado es válido
+    if (mesObjetivo < 1 || mesObjetivo > 12) {
+        printf("Error: Mes inválido.\n");
+        return;
+    }
+
+    // Convierte el número del mes en una cadena con formato "mm"
+    char mesStr[3];
+    snprintf(mesStr, 3, "%02d", mesObjetivo);
+
+    // Inicializa variables para almacenar el producto más vendido y la cantidad máxima vendida
+    struct infoProducto *productoMasVendido = NULL;
+    int maxCantidadVendida = 0;
+
+    // Itera sobre todas las sucursales de la cadena de farmacias
+    struct Sucursales *sucursal = farmaSalud->headSucursales;
+    while (sucursal != NULL)
+    {
+        // Itera sobre todas las boletas de venta de cada sucursal
+        struct Ventas *boleta = sucursal->boletas;
+        while (boleta != NULL)
+        {
+            // Verifica si la boleta corresponde al mes objetivo
+            if (strncmp(boleta->fecha, mesStr, 2) == 0)
+            {
+                // Itera sobre todos los productos vendidos de la boleta
+                struct productosVendidos *vendido = boleta->vendidos;
+
+                while (vendido != NULL)
+                {
+                    // Actualiza el producto más vendido si la cantidad vendida es mayor que la máxima encontrada hasta ahora
+                    if (vendido->cantidadVendida > maxCantidadVendida)
+                    {
+                        maxCantidadVendida = vendido->cantidadVendida;
+                        productoMasVendido = vendido->producto;
+                    }
+                    vendido = vendido->sig;
+                }
+            }
+            boleta = boleta->sig;
+        }
+        sucursal = sucursal->sig;
+    }
+
+    // Muestra el producto más vendido del mes objetivo, si se encontró alguno
+    if (productoMasVendido != NULL)
+    {
+        printf("Producto más vendido del mes %d:\n", mesObjetivo);
+        printf("  Código: %s\n  Nombre: %s\n  Cantidad vendida: %d\n", productoMasVendido->codigo, productoMasVendido->nombre, maxCantidadVendida);
+    } else {
+
+        // Muestra un mensaje si no se encontraron ventas para el mes objetivo
+        printf("No se encontraron ventas para el mes %d.\n", mesObjetivo);
+    }
+}
+/*
+* Función para imprimir el producto más vendido en una sucursal para un mes específico.
+* Parámetros:
+* - Puntero al producto más vendido.
+* - Cantidad vendida del producto más vendido.
+* - Número del mes objetivo.
+* - ID de la sucursal en la que se realizó la búsqueda.
+*/
+void imprimirProductoMasVendido(struct infoProducto *producto, int cantidadVendida, int mes, int idSucursal)
+{
+    if (producto != NULL)
+    {
+        printf("El producto más vendido del mes %d en la sucursal con ID %d es:\n", mes, idSucursal);
+
+        printf("  Código: %s\n  Nombre: %s\n  Cantidad vendida: %d\n", producto->codigo, producto->nombre,cantidadVendida);
+    }
+    else
+    {
+        printf("No se encontraron ventas para el mes %d en la sucursal con ID %d.\n", mes, idSucursal);
+    }
+}
+
+
+
+/*
+ * Función que busca el producto más vendido en un mes de una sucursal en específico.
+ * Parámetros:
+ * -Puntero a la estructura de la sucursal en la que se realizará la búsqueda.
+ * - Id de la suucursal especificada
+ */
+
+void productoMasVendidoSucursal(struct Sucursales *sucursal ,int idSucursal)
+{
+    int mesObjetivo;
+
+    // Solicita al usuario ingresar el mes objetivo
+    printf("Ingrese el número del mes (1-12) para el cual desea encontrar el producto más vendido: ");
+    scanf("%d", &mesObjetivo);
+
+    // Verifica si el mes ingresado es válido (entre 1 y 12)
+    if (mesObjetivo < 1 || mesObjetivo > 12)
+    {
+        printf("Mes inválido.\n");
+        return;
+    }
+
+ 
+    // Convierte el número del mes en una cadena con dos dígitos(mm)
+    char mesStr[3];
+    snprintf(mesStr, 3, "%02d", mesObjetivo);
+
+    // Busca la sucursal con el ID ingresado
+    struct Sucursales *sucursalObjetivo = buscarSucursal(sucursal, idSucursal);
+
+    // Verifica si la sucursal existe en el sistema
+    if (sucursalObjetivo == NULL)
+    {
+        printf("Sucursal no registrada.\n");
+        return;
+    }
+
+    struct infoProducto *productoMasVendido = NULL;
+    int maxCantidadVendida = 0;
+
+    // Recorre las ventas de la sucursal para el mes especificado
+    struct Ventas *boleta = sucursalObjetivo->boletas;
+    while (boleta != NULL)
+    {
+        // Verifica si la boleta pertenece al mes objetivo
+        if (strncmp(boleta->fecha, mesStr, 2) == 0)
+        {
+            // Recorre los productos vendidos en la boleta
+            struct productosVendidos *vendido = boleta->vendidos;
+            while (vendido != NULL)
+            {
+                // Busca el producto más vendido en el mes objetivo
+                if (vendido->cantidadVendida > maxCantidadVendida)
+                {
+                    maxCantidadVendida = vendido->cantidadVendida;
+                    productoMasVendido = vendido->producto;
+                }
+                vendido = vendido->sig;
+            }
+        }
+        boleta = boleta->sig;
+    }
+
+    // Llamar a la función de impresión
+    imprimirProductoMasVendido(productoMasVendido, maxCantidadVendida, mesObjetivo, idSucursal);
+
+}
+
+
+
+
+/*
+ * Función para agregar un lote al inventario de un producto en el stock de productos.
+ * Parámetros:
+ * - Puntero al nodo de stock de productos al que se desea agregar el lote.
+ * - Cantidad del lote a agregar.
+ * - Identificador del lote.
+ * - Fecha de vencimiento del lote.
+ */
+void agregarLote(struct stockProductos *HeadStock, int cantidad, char *lote, char *fechaVencimiento)
+{
+    // Se crea un nuevo nodo para el lote
+    struct controlLote *nuevoLote;
+    nuevoLote = (struct controlLote*)malloc(sizeof(struct controlLote));
+
+    // Se verifica si la asignación de memoria fue exitosa
+    if (nuevoLote == NULL)
+    {
+        printf("ERROR AL ASIGNAR MEMORIA");
+        exit(EXIT_FAILURE);
+    }
+
+    // Se asignan los valores al nuevo lote
+    nuevoLote->lote = lote;
+    nuevoLote->fechaVencimiento = fechaVencimiento;
+    nuevoLote->cantidadDisponible = cantidad;
+    nuevoLote->sig = NULL;
+
+    // Si no hay lotes previamente en el stock, el nuevo lote se convierte en el primer lote
+    if (HeadStock->lotesProducto == NULL)
+    {
+        HeadStock->lotesProducto = nuevoLote;
+    }
+    else
+    {
+        // Si ya hay lotes en el stock, se busca el último lote y se agrega el nuevo lote al final
+        struct controlLote *temp = HeadStock->lotesProducto;
+        while (temp->sig != NULL)
+        {
+            temp = temp->sig;
+        }
+        temp->sig = nuevoLote;
+    }
+
+    // Se actualiza la cantidad disponible en el stock de productos
+    HeadStock->cantidadDisponible += cantidad;
+}
+
+
+
+
+
+
+/*
+ * Función para actualizar el stock de lotes de un producto en el stock de productos después de una venta.
+ * Parámetros:
+ * - Puntero al nodo de stock de productos que se desea actualizar.
+ * - Cantidad de productos vendidos.
+ */
+void actualizarStockLotes(struct stockProductos *stock, int cantidad)
+{
+    // Verifica si el stock es NULL
+    if (stock == NULL)
+    {
+        printf("Error: El stock no puede ser nulo.\n");
+        return;
+    }
+
+    struct controlLote *loteActual = stock->lotesProducto;
+    int cantidadActual = cantidad;
+
+    // Itera sobre los lotes del stock y actualiza las cantidades disponibles
+    while (loteActual != NULL && cantidadActual > 0)
+    {
+        // Si la cantidad disponible en el lote actual es suficiente para la venta
+        if (loteActual->cantidadDisponible >= cantidadActual)
+        {
+            // Se actualiza la cantidad disponible en el lote y en el stock de productos
+            loteActual->cantidadDisponible -= cantidadActual;
+            stock->cantidadDisponible -= cantidad;
+            cantidadActual = 0; // Se completa la venta
+        }
+        else
+        {
+            // Si la cantidad disponible en el lote actual no es suficiente
+            cantidadActual -= loteActual->cantidadDisponible;
+            stock->cantidadDisponible -= loteActual->cantidadDisponible;
+            loteActual->cantidadDisponible = 0; // Se establece la cantidad disponible del lote a 0
+
+            // Se remueve el lote actual de la lista de lotes y se libera la memoria
+            struct controlLote *temp = loteActual;
+            loteActual = loteActual->sig;
+
+            // Se actualiza el puntero al primer lote en caso de que el lote eliminado sea el primero
+            if (temp == stock->lotesProducto)
+            {
+                stock->lotesProducto = loteActual;
+            }
+            else
+            {
+                // Se busca el lote anterior al lote actual y se actualiza su puntero
+                struct controlLote *prev = stock->lotesProducto;
+                while (prev != temp)
+                {
+                    prev = prev->sig;
+                }
+                prev->sig = loteActual;
+            }
+            free(temp); // Se libera la memoria del lote eliminado
+        }
+    }
+
+    // Si aún queda cantidad por vender y no hay suficientes productos en el stock
+    if (cantidadActual > 0)
+    {
+        printf("Stock insuficiente para la venta. Faltan %d unidades.\n", cantidadActual);
+    }
+}
+
+
+
+
+
+/*
+ * Función para buscar un stock de producto por su código en una lista enlazada de stocks.
+ * Parámetros:
+ * - Puntero al primer nodo de la lista enlazada de stocks.
+ * - Puntero al producto que se desea buscar en los stocks.
+ * Retorna:
+ * - Puntero al nodo del stock encontrado o NULL si no se encontro
+ */
+struct stockProductos *buscarStockProducto(struct stockProductos *head, struct infoProducto *productoBuscado)
+{
+    // Inicializa el puntero de recorrido en el primer nodo de la lista
+    struct stockProductos *RecStocks = head;
+
+    // Itera sobre la lista de stocks
+    while (RecStocks != NULL)
+    {
+        // Comprueba si el código del stock actual coincide con el código del producto buscado
+        if (strcmp(RecStocks->codigoMedicamento, productoBuscado->codigo) == 0)
+        {
+            return RecStocks; // Devuelve el nodo del stock encontrado
+        }
+        else
+        {
+            // Si la cantidad es 0 retorna NULL
+            if (RecStocks->cantidadDisponible == 0)
+            {
+                return NULL;
+            }
+        }
+        // Avanza al siguiente nodo de la lista
+        RecStocks = RecStocks->sig;
+    }
+
+    // Si no se encuentra ningún stock con el código del producto buscado se retorna NULL
+    return NULL;
+}
+
+
+/*
+ * Función para realizar una venta de un producto.
+ * Parámetros:
+ * - Puntero a la raíz del árbol de inventario de productos.
+ * - Puntero al primer nodo de la lista enlazada de stocks de productos.
+ * - Código del producto que se desea vender.
+ * - Cantidad del producto que se desea vender.
+ */
+void realizarVenta(struct NodoABB *inventario, struct stockProductos *stock, char *codigoProducto, int cantidad)
+{
+    // Busca el producto en el inventario
+    struct infoProducto *Producto = buscarProductoEnInventario(inventario, codigoProducto);
+
+    // Si el producto es NULL el producto no se encontro en el inventario
+    if (Producto == NULL)
+    {
+        printf("Producto no encontrado en el inventario.\n");
+        return;
+    }
+
+    // Si el Producto Tiene Receta preguntamos si el cliente posee dicha receta para adquirir el producto
+    if (Producto->recetaSN == 1)
+    {
+        int tieneReceta;
+
+        printf("El producto requiere receta médica.\n");
+
+        printf("¿Tiene receta médica? (1: Sí - 2: No): ");
+        scanf("%d", &tieneReceta);
+
+        // si el cliente tiene receta seguimos con la operacion de buscar el stock del producto
+
+        if (tieneReceta == 1)
+        {
+            // Busca el stock del producto
+            struct stockProductos *StockDeProducto = buscarStockProducto(stock, Producto);
+            if (StockDeProducto == NULL)
+            {
+                printf("Stock del producto no encontrado o agotado.\n");
+                return;
+            }
+
+            // Verifica si hay suficiente stock disponible para la venta
+            if (StockDeProducto->cantidadDisponible < cantidad)
+            {
+                printf("Stock insuficiente para la venta.\n");
+                return;
+            }
+
+            // Actualiza el stock disponible
+            StockDeProducto->cantidadDisponible -= cantidad;
+
+            // Si la cantidad disponible es cero, elimina el producto del inventario
+            if (StockDeProducto->cantidadDisponible == 0)
+            {
+                buscarYEliminarEnInventario(&inventario, codigoProducto);
+            }
+
+            // Actualiza el stock de lotes de productos
+            actualizarStockLotes(stock, cantidad);
+        }
+        else
+        {
+            printf("No se puede realizar la venta del producto si no tiene receta médica.\n");
+        }
+    }
+    else
+    {
+        // Busca el stock del producto
+        struct stockProductos *StockDeProducto = buscarStockProducto(stock, Producto);
+        if (StockDeProducto == NULL)
+        {
+            printf("Stock del producto no encontrado o agotado.\n");
+            return;
+        }
+
+        // Verifica si hay suficiente stock disponible para la venta
+        if (StockDeProducto->cantidadDisponible < cantidad)
+        {
+            printf("Stock insuficiente para la venta.\n");
+            return;
+        }
+
+        // Actualiza el stock disponible
+        StockDeProducto->cantidadDisponible -= cantidad;
+
+        // Si la cantidad disponible es cero, elimina el producto del inventario
+        if (StockDeProducto->cantidadDisponible == 0)
+        {
+            buscarYEliminarEnInventario(&inventario, codigoProducto);
+        }
+
+        // Actualiza el stock de lotes de productos
+        actualizarStockLotes(stock, cantidad);
+    }
+}
+
+
+/*
+ * Función para restaurar el stock de un producto después de una venta cancelada o devolución.
+ * Parámetros:
+ * - Puntero al primer nodo de la lista enlazada de stocks de productos.
+ * - Código del producto cuyo stock se desea restaurar.
+ * - Cantidad del producto que se desea restaurar al stock.
+ */
+void restaurarStock(struct stockProductos *headStock,char *codigoProducto, int cantidadVendida)
+{
+
+    
+    // Inicia el puntero de recorrido en el primer nodo de la lista
+    struct stockProductos *rec = headStock;
+
+    // Recorre la lista de stocks de productos
+    while (rec != NULL)
+    {
+        
+        // Comprueba si el código del producto en el nodo actual coincide con el código proporcionado
+        if (rec->codigoMedicamento ==codigoProducto)
+        {
+            // Incrementa la cantidad disponible del producto en el stock
+            rec->cantidadDisponible += cantidadVendida;
+            return;
+        }
+
+        // Avanza al siguiente nodo de la lista
+        rec = rec->sig;
+    }
+    
+}
+
+/*
+ * Función para eliminar un producto de la lista de productos vendidos en una boleta.
+ * Parámetros:
+ * - Puntero al puntero al primer nodo de la lista enlazada de productos vendidos.
+ * - Código del producto que se desea eliminar de la boleta.
+ * - Cantidad del producto que se desea eliminar de la boleta.
+ */
+void removerDeBoleta(struct productosVendidos **vendidos, char *codigo, int cantidadVendida)
+{
+    struct productosVendidos *rec = *vendidos;
+    struct productosVendidos *prev = NULL;
+
+    // Recorre la lista de productos vendidos en la boleta
+    while (rec != NULL)
+    {
+        // Comprueba si el código del producto en el nodo actual coincide con el código proporcionado
+        if (strcmp(rec->producto->codigo, codigo) == 0)
+        {
+            // Verifica si se pueden eliminar parcial o totalmente las unidades vendidas del producto
+            if (rec->cantidadVendida > cantidadVendida)
+            {
+                rec->cantidadVendida -= cantidadVendida;
+            }
+            else
+            {
+                // Elimina el nodo actual si se han vendido todas las unidades del producto
+                if (prev == NULL)
+                {
+                    *vendidos = rec->sig;
+                }
+                else
+                {
+                    prev->sig = rec->sig;
+                }
+                free(rec);
+            }
+            return;
+        }
+        prev = rec;
+        rec = rec->sig;
+    }
+
+    // Informa si el producto no se encuentra en la boleta
+    printf("Producto con código %s no encontrado en la boleta.\n", codigo);
+}
+
+
+
+/*
+ * Función para guardar los datos de un producto en la lista de productos vendidos en una boleta.
+ * Parámetros:
+ * - Puntero a la boleta en la que se guardarán los datos del producto.
+ * - Puntero al producto que se desea guardar en la boleta.
+ * - Cantidad del producto que se vendió y se desea guardar en la boleta.
+ */
+void guardarDatosBoleta(struct Ventas *boleta, struct infoProducto *Producto, int cantidadVendida)
+{
+    // Inicializa un puntero para recorrer la lista de productos vendidos en la boleta
+    struct productosVendidos *Actual = boleta->vendidos;
+
+    // Verifica si el producto ya está en la lista de productos vendidos en la boleta
+    while (Actual != NULL)
+    {
+        // Si el producto ya está en la lista, actualiza la cantidad vendida y el monto total
+        if (strcmp(Actual->producto->codigo, Producto->codigo) == 0)
+        {
+            Actual->cantidadVendida += cantidadVendida;
+            Actual->montoProducto = cantidadVendida * Actual->producto->costo;
+            boleta->montoTotal += cantidadVendida * Actual->producto->costo;
+            return; // Sale de la función si el producto ya está en la lista
+        }
+        Actual = Actual->sig; // Avanza al siguiente nodo de la lista
+    }
+
+    // Si el producto no está en la lista, se crea un nuevo nodo y se agrega a la lista
+    struct productosVendidos *nuevo = (struct productosVendidos*)malloc(sizeof(struct productosVendidos));
+    if (nuevo == NULL)
+    {
+        printf("ERROR AL ASIGNAR MEMORIA");
+        return;
+    }
+
+    // Inicializa los datos del nuevo nodo
+    nuevo->producto = Producto;
+    nuevo->cantidadVendida = cantidadVendida;
+    nuevo->montoProducto = cantidadVendida * Producto->costo;
+    nuevo->sig = boleta->vendidos; // Conecta el nuevo nodo al principio de la lista
+    boleta->vendidos = nuevo; // Actualiza el puntero a la lista de productos vendidos en la boleta
+
+    // Actualiza el monto total de la boleta
+    boleta->montoTotal += cantidadVendida * Producto->costo;
+}
+
+
+
+
+
+/*
+ * Función para imprimir una boleta de venta.
+ * Parámetros:
+ * - Puntero a la boleta de venta que se desea imprimir.
+ */
+void imprimirBoleta(struct Ventas *boleta) 
+{
+    // Verifica si la boleta es nula
+    if (boleta == NULL) {
+        printf("Sucursal Sin Boletas");
+        return;
+    }
+
+    struct Ventas *Actual = boleta;
+
+    // Busca la última boleta (la más reciente)
+    while (Actual->sig != NULL) {
+
+        Actual = Actual->sig;
+    }
+
+    // Imprime la información de la boleta
+    printf("\n=== Boleta de Venta ===\n");
+    printf("Sucursal: %s\n", Actual->direccion);
+    // Corrección: Acceder al número de boleta desde el array
+    printf("Número de Boleta: %d\n", Actual->numeroBoleta[0]);  
+    printf("Fecha: %s\n", Actual->fecha);
+    printf("---------------------\n");
+
+    // Imprime los productos vendidos en la boleta
+    struct productosVendidos *vendido = Actual->vendidos;
+    while (vendido != NULL) 
+    {
+        printf("%s x %d - $%d\n", vendido->producto->nombre, vendido->cantidadVendida, vendido->montoProducto);
+        vendido = vendido->sig;
+    }
+    printf("---------------------\n");
+    printf("Total: $%d\n\n", Actual->montoTotal);
+
+}
+
+/*
+ * Función para generar una boleta de venta para una sucursal.
+ * Parámetros:
+ * - Puntero a la  sucursal.
+ * Retorna:
+ * - Puntero a la boleta de venta generada.
+ */
+struct Ventas *generarBoleta(struct Sucursales *sucursal)
+{
+    // Se reserva memoria para la nueva boleta
+
+    struct Ventas *boletaActual = (struct Ventas *) malloc(sizeof(struct Ventas));
+
+    // Se reserva memoria para la fecha de la boleta
+    char *fecha;
+    fecha = (char *) malloc(sizeof(char));
+
+    // Se solicita al usuario ingresar la fecha actual
+    printf("Ingrese La Fecha Actual:(dia-mes-anio)");
+    scanf("%s", fecha);
+
+    // Se verifica si se pudo asignar memoria para la boleta
+    if (boletaActual == NULL)
+    {
+        printf("ERROR AL GENERAR BOLETA");
+        return NULL;
+    }
+
+    if (sucursal->boletas == NULL) 
+    {
+        // Inicializar el número de boleta en 1
+        boletaActual->numeroBoleta[0] = 1;
+    } 
+    else 
+    {
+        // Si la sucursal ya tiene boletas registradas, se obtiene la última boleta
+        struct Ventas *ultimaBoleta = sucursal->boletas;
+        while (ultimaBoleta->sig != NULL) {
+            ultimaBoleta = ultimaBoleta->sig;
+        }
+        boletaActual = ultimaBoleta->sig;
+
+        // Incrementar el número de boleta
+        boletaActual->numeroBoleta[0] = ultimaBoleta->numeroBoleta[0] + 1;
+    }
+
+    // Se asignan los datos a la nueva boleta
+    boletaActual->direccion = sucursal->direccion;
+    boletaActual->montoTotal = 0;
+    boletaActual->vendidos = NULL;
+    boletaActual->fecha = fecha;
+
+    int NumeroBoleta;
+
+    // Si la sucursal no tiene boletas registradas
+    if (sucursal->boletas == NULL)
+    {
+
+        NumeroBoleta = 0;
+
+        // Se asignan los datos a la nueva boleta
+        boletaActual->numeroBoleta[0] = NumeroBoleta;
+        boletaActual->direccion = sucursal->direccion;
+        boletaActual->montoTotal = 0;
+        boletaActual->vendidos = NULL;
+        boletaActual->fecha = fecha;
+
+        sucursal->boletas = boletaActual;
+
+    }
+    else
+    {
+        // Si la sucursal ya tiene boletas registradas, se obtiene la última boleta
+        struct Ventas *ultimaBoleta = sucursal->boletas;
+
+        while (ultimaBoleta->sig != NULL)
+        {
+            ultimaBoleta = ultimaBoleta->sig;
+        }
+        boletaActual = ultimaBoleta->sig;
+
+        // Se asignan los datos a la nueva boleta
+        boletaActual->numeroBoleta[0] = ultimaBoleta->numeroBoleta[0] + 1;
+        boletaActual->direccion = sucursal->direccion;
+        boletaActual->montoTotal = 0;
+        boletaActual->vendidos = NULL;
+        boletaActual->fecha = fecha;
+    }
+
+    // Variable para continuar con la boleta
+    int  seguir = 1;
+
+    // Bucle principal para manejar las operaciones de venta
+    while (seguir != 2)
+    {
+        int opcion;
+
+        // Menú de opciones para la venta
+        do {
+            printf("Ingrese Una Opción Para La Venta:\n");
+            printf("1. Añadir Producto/s a Vender\n");
+            printf("2. Retirar Producto/s de la venta\n");
+            printf("3. Terminar Las Operaciones Y Mostrar Boleta\n");
+            printf("Ingrese La Opción: ");
+            scanf("%d", &opcion);
+        } while (opcion < 1 || opcion > 3);
+
+        // Se ejecuta la opción seleccionada por el usuario
+        switch (opcion)
+        {
+            case 1:
+            {
+                // Opción para agregar productos a la venta
+                int continuar = 1;
+
+                while (continuar != 2)
+                {
+                    // Variables para almacenar datos de la venta
+                    char *codigoProducto = (char *) malloc(sizeof(char));
+                    struct infoProducto *producto;
+                    int cantidadVendida;
+
+                    // Se solicita al usuario ingresar los datos del producto a vender
+                    // Se valida el código del producto
+                    int longitud;
+                    do {
+                        printf("Ingrese el codigo del producto (10 caracteres): ");
+                        scanf("%10s", codigoProducto);
+                        longitud = strlen(codigoProducto);
+                        if (longitud != 10)
+                        {
+                            printf("Ingrese un codigo valido de 10 caracteres: ");
+                        }
+                    } while (longitud != 10);
+
+                    printf("Ingrese la Cantidad a vender: ");
+                    scanf("%d", &cantidadVendida);
+
+                    // Se busca el producto en el inventario de la sucursal
+                    producto = buscarProductoEnInventario(sucursal->inventario, codigoProducto);
+
+                    if (producto == NULL)
+                    {
+                        printf("Producto No Encontrado En El Inventario\n");
+                        break;
+                    }
+
+                    // Se realiza la venta del producto
+                    realizarVenta(sucursal->inventario, sucursal->headStocks, codigoProducto, cantidadVendida);
+                    // Se actualiza la boleta con los datos de la venta
+                    guardarDatosBoleta(boletaActual, producto, cantidadVendida);
+
+                    // Se consulta al usuario si desea agregar más productos
+                    printf("Desea Agregar Otro/s Producto/s ??");
+                    printf("1.SI 2.NO  :");
+                    scanf("%d", &continuar);
+                }
+                // Se actualizan los datos de la boleta
+                boletaActual->direccion = sucursal->direccion;
+                boletaActual->numeroBoleta[0]++;
+                break;
+            }
+
+            case 2: {
+                // Opción para retirar productos de la venta
+                char *codigoProducto;
+                
+                codigoProducto = (char *)malloc(11*sizeof(char));
+                if(codigoProducto == NULL)
+                {
+                    printf("ERROR");
+                    free(codigoProducto);
+                }
+                
+                int opcionQuitarSN;
+                int cantidadVendida;
+
+                printf("Desea Eliminar Algun  Producto? \n");
+                printf("1.SI 2.No :");
+                opcionQuitarSN = scanf("%d", &opcionQuitarSN);
+
+                if (opcionQuitarSN == 1)
+                {
+                    printf("Ingrese el codigo del Producto: ");
+                    scanf("%s", codigoProducto);
+
+                    printf("Ingrese la Cantidad a eliminar: ");
+                    scanf("%d", &cantidadVendida);
+
+                    // Se restaura el stock del producto
+                    restaurarStock(sucursal->headStocks, codigoProducto, cantidadVendida);
+                    // Se remueve el producto de la boleta
+                    removerDeBoleta(&boletaActual->vendidos, codigoProducto, cantidadVendida);
+                } else
+                {
+                    break;
+                }
+                break;
+            }
+
+            case 3 :
+            {
+                // Opción para terminar las operaciones y mostrar la boleta
+                imprimirBoleta(boletaActual);
+                return boletaActual;
+            }
+        }
+
+        // Se consulta al usuario si desea seguir con la boleta
+        printf("Seguir Con la Boleta?\n");
+        printf("1.SI 2.NO:");
+        scanf("%d",&seguir);
+    }
+    // Se devuelve la boleta actualizada
+    return boletaActual;
+}
+
+
+
+/*
+ * Función para generar una orden de compra para un producto en particular.
+ * Parámetros:
+ * - Puntero al stock del producto para el cual se genera la orden de compra.
+ * - Puntero a la  sucursal.
+ */
+void GetOrdenCompra(struct stockProductos *stock, struct Sucursales *sucursal)
+        {
+    // Imprimir los detalles de la orden de compra
+    printf("Generando orden de compra para el producto con código: %s\n", stock->codigoMedicamento);
+
+    printf("Cantidad a ordenar: %d\n", 10 - stock->cantidadDisponible);
+
+    if (stock->lotesProducto != NULL)
+    {
+        printf("Proveedor: %s\n", stock->lotesProducto->lote);
+    }
+    // Imprimir detalles de la sucursal
+    printf("Sucursal: %s, %s, %s\n", sucursal->direccion, sucursal->comuna, sucursal->region);
+    printf("-------------------------------------------------\n");
+}
+
+
+
+/*
+ * Función para generar órdenes de compra para productos con bajo stock en todas las sucursales de FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura de datos de FarmaSalud.
+ */
+void generarOrdenesCompra(struct FarmaSalud *farmaSalud)
+{
+    // Obtener la primera sucursal de FarmaSalud
+    struct Sucursales *sucursal = farmaSalud->headSucursales;
+
+    // Recorrer todas las sucursales
+    while (sucursal != NULL)
+    {
+        // Obtener el stock de productos de la sucursal actual
+        struct stockProductos *stock = sucursal->headStocks;
+        // Recorrer todos los productos del stock
+        while (stock != NULL) {
+
+            // Verificar si el stock del producto es bajo (menos de 10 unidades)
+            if (stock->cantidadDisponible < 10)
+            {
+                // Generar una orden de compra para el producto con bajo stock en la sucursal actual
+                GetOrdenCompra(stock, sucursal);
+            }
+            // Avanzar al siguiente producto en el stock
+            stock = stock->sig;
+        }
+        // Avanzar a la siguiente sucursal en FarmaSalud
+        sucursal = sucursal->sig;
+    }
+}
+
+/*
+ * Función para verificar alertas de caducidad próxima y desabastecimiento de productos en todas las sucursales de FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura de datos de FarmaSalud.
+ */
+void verificarAlertas(struct FarmaSalud *farmaSalud)
+{
+    // Obtener el primer producto en la lista total de productos de FarmaSalud
+    struct Productos *producto = farmaSalud->headTotalProductos;
+
+    // Obtener la fecha actual
+    time_t ahora = time(NULL);
+    struct tm *fechaActual = localtime(&ahora);
+
+    // Declarar variables para almacenar la fecha de vencimiento y calcular la diferencia de días
+    struct tm fechaVencimiento;
+    double diferencia;
+    int diasParaVencimiento;
+
+    // Imprimir encabezado para las alertas
+    printf("Alertas de caducidad próxima y desabastecimiento:\n");
+
+    // Recorrer todos los productos en la lista total de productos de FarmaSalud
+    while (producto != NULL)
+    {
+        // Inicializar la estructura fechaVencimiento a cero
+        memset(&fechaVencimiento, 0, sizeof(struct tm));
+
+        // Intentar leer la fecha de vencimiento del producto y calcular los días para el vencimiento
+        if (sscanf(producto->producto->fechaVencimiento, "%d-%d-%d", &fechaVencimiento.tm_mday, &fechaVencimiento.tm_mon, &fechaVencimiento.tm_year) == 3) {
+            // Ajustar el formato de mes y año para localtime
+            fechaVencimiento.tm_mon -= 1;
+            fechaVencimiento.tm_year -= 1900;
+
+            // Calcular la diferencia de tiempo en segundos entre la fecha de vencimiento y la fecha actual
+            diferencia = difftime(mktime(&fechaVencimiento), mktime(fechaActual));
+            // Convertir la diferencia de tiempo en días
+            diasParaVencimiento = (int)(diferencia / (60 * 60 * 24));
+
+            // Verificar si el producto caduca en menos de 30 días
+            if (diasParaVencimiento <= 30) {
+                printf("Producto %s (código: %s) caducará en %d días.\n", producto->producto->nombre, producto->producto->codigo, diasParaVencimiento);
+            }
+        }
+        else
+        {
+            // Imprimir mensaje de error si el formato de fecha es incorrecto para el producto
+            printf("Formato de fecha incorrecto para el producto %s (código: %s).\n", producto->producto->nombre, producto->producto->codigo);
+        }
+
+        // Buscar el stock del producto en todas las sucursales y verificar el desabastecimiento
+        struct Sucursales *sucursal = farmaSalud->headSucursales;
+        while (sucursal != NULL) {
+            struct stockProductos *stock = sucursal->headStocks;
+            while (stock != NULL) {
+                // Verificar si el código del producto coincide y el stock es bajo (menos de 10 unidades)
+                if (strcmp(stock->codigoMedicamento, producto->producto->codigo) == 0 && stock->cantidadDisponible < 10) {
+                    printf("Producto %s (código: %s) tiene bajo stock: %d unidades disponibles en la sucursal %s.\n", producto->producto->nombre, producto->producto->codigo, stock->cantidadDisponible, sucursal->direccion);
+                }
+                stock = stock->sig;
+            }
+            sucursal = sucursal->sig;
+        }
+
+        // Avanzar al siguiente producto en la lista total de productos de FarmaSalud
+        producto = producto->sig;
+    }
+}
+
+
+
+
+/*
+ * Función para agregar un nuevo producto a la lista total de productos de FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura de datos de FarmaSalud.
+ * - Puntero a la información del nuevo producto.
+ */
+void agregarProductoLista(struct FarmaSalud *farmaSalud, struct infoProducto *productoInfo)
+{
+    // Crear un nuevo nodo para el producto
+    struct Productos *nuevoProducto = (struct Productos *)malloc(sizeof(struct Productos));
+
+    // Verificar si se asignó memoria correctamente
+    if (!nuevoProducto) {
+        perror("Error al asignar memoria");
+        exit(EXIT_FAILURE);
+    }
+
+    // Establecer la información del producto y configurar el siguiente nodo como nulo
+    nuevoProducto->producto = productoInfo;
+    nuevoProducto->sig = NULL;
+
+    // Verificar si la lista de productos está vacía
+    if (farmaSalud->headTotalProductos == NULL)
+    {
+        // Si está vacía, el nuevo producto se convierte en la cabeza de la lista
+        farmaSalud->headTotalProductos = nuevoProducto;
+        return;
+    }
+
+    // Si la lista no está vacía, buscar el último nodo
+    struct Productos *temp = farmaSalud->headTotalProductos;
+    while (temp->sig != NULL) {
+        temp = temp->sig;
+    }
+
+    // Agregar el nuevo producto al final de la lista
+    temp->sig = nuevoProducto;
+}
+
+
+
+/*
+ * Función para agregar un nuevo producto a la lista total de productos de FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura de datos de FarmaSalud.
+ */
+void agregarProductoGlobal(struct FarmaSalud *farmaSalud)
+{
+    // Crear una estructura para almacenar la información del producto
+    struct infoProducto *productoInfo = (struct infoProducto *)malloc(sizeof(struct infoProducto));
+    if (!productoInfo)
+    {
+        perror("Error al asignar memoria");
+        exit(EXIT_FAILURE);
+    }
+
+    // Asignar memoria para cada atributo de la información del producto
+    productoInfo->nombre = (char *)malloc(50 * sizeof(char));
+
+    productoInfo->codigo = (char *)malloc(11 * sizeof(char));
+
+    productoInfo->descripcion = (char *)malloc(100 * sizeof(char));
+
+    productoInfo->categoria = (char *)malloc(50 * sizeof(char));
+
+    productoInfo->fechaVencimiento = (char *)malloc(11 * sizeof(char));
+
+    productoInfo->proveedor = (char *)malloc(50 * sizeof(char));
+
+    productoInfo->lote = (char *)malloc(20 * sizeof(char));
+
+    // Verificar si se asignó memoria correctamente para cada atributo
+    if (!productoInfo->nombre || !productoInfo->codigo || !productoInfo->descripcion || !productoInfo->categoria ||
+        !productoInfo->fechaVencimiento || !productoInfo->proveedor || !productoInfo->lote)
+    {
+        perror("Error al asignar memoria");
+        exit(EXIT_FAILURE);
+    }
+
+    // Solicitar al usuario que ingrese la información del nuevo producto
+    printf("Ingrese el nombre del Producto: ");
+    scanf("%49s", productoInfo->nombre);
+
+    int longitud;
+    do {
+        printf("Ingrese el codigo del producto (10 caracteres): ");
+        scanf("%10s", productoInfo->codigo);
+        longitud = strlen(productoInfo->codigo);
+        if (longitud != 10)
+        {
+            printf("Ingrese un codigo valido de 10 caracteres\n");
+        }
+    } while (longitud != 10);
+
+    printf("Ingrese descripcion del producto: ");
+    scanf("%s", productoInfo->descripcion);
+
+    printf("Ingrese la categoria del Producto: ");
+    scanf("%s", productoInfo->categoria);
+
+    printf("Ingrese fecha de vencimiento del producto (dia-mes-año): ");
+    scanf("%10s", productoInfo->fechaVencimiento);
+
+    printf("Ingrese el Nombre del proveedor: ");
+    scanf("%s", productoInfo->proveedor);
+
+    printf("Ingrese lote: ");
+    scanf("%19s", productoInfo->lote);
+
+    printf("El producto necesita receta? Ingrese 1 (si) o 2 (no): ");
+    scanf("%d", &productoInfo->recetaSN);
+
+    printf("Ingrese el costo del producto: ");
+    scanf("%d", &productoInfo->costo);
+
+    // Agregar el nuevo producto a la lista total de productos
+    agregarProductoLista(farmaSalud, productoInfo);
+}
+
+
+/*
+ * Función para eliminar un producto de la lista total de productos de FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura de datos de FarmaSalud.
+ * - Código del producto a eliminar.
+ */
+void eliminarProductoGlobal(struct FarmaSalud *farmaSalud, char *codigoEliminar)
+{
+    struct Productos *rec = farmaSalud->headTotalProductos;
+    struct Productos *prev = NULL;
+
+    // Buscar el producto con el código especificado
+    while (rec != NULL && strcmp(rec->producto->codigo, codigoEliminar) != 0)
+    {
+        prev = rec;
+        rec = rec->sig;
+    }
+
+    // Verificar si se encontró el producto
+    if (rec == NULL) {
+        printf("Producto con codigo %s no encontrado.\n", codigoEliminar);
+        return;
+    }
+
+    // Eliminar el producto de la lista
+    if (prev == NULL)
+    {
+        farmaSalud->headTotalProductos = rec->sig;
+    } else {
+        prev->sig = rec->sig;
+    }
+
+    // Liberar la memoria asignada al nodo eliminado
+    free(rec->producto->nombre);
+    free(rec->producto->codigo);
+    free(rec->producto->descripcion);
+    free(rec->producto->categoria);
+    free(rec->producto->fechaVencimiento);
+    free(rec->producto->proveedor);
+    free(rec->producto->lote);
+    free(rec->producto);
+    free(rec);
+
+    printf("Producto con codigo %s eliminado.\n", codigoEliminar);
+}
+
+
+/*
+ * Función para modificar la información de un producto en FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura de datos de FarmaSalud.
+ * - Código del producto a modificar.
+ */
+void modificarProducto(struct FarmaSalud *farmaSalud, char *codigoProducto)
+{
+    // Obtener el puntero al primer producto en la lista de productos globales
+    struct Productos *productoActual = farmaSalud->headTotalProductos;
+
+    // Iterar sobre la lista de productos globales para encontrar el producto con el código especificado
+    while (productoActual != NULL)
+    {
+        // Verificar si el código del producto actual coincide con el código especificado
+        if (strcmp(productoActual->producto->codigo, codigoProducto) == 0)
+        {
+            int opcion;
+
+            // Ciclo para permitir al usuario elegir qué campo desea modificar
+            do {
+                // Menú de opciones de modificación
+                printf("\n¿Qué desea modificar?\n");
+                printf("1. Nombre\n");
+                printf("2. Descripción\n");
+                printf("3. Categoría\n");
+                printf("4. Proveedor\n");
+                printf("5. Lote\n");
+                printf("6. Costo\n");
+                printf("7. Fecha de Vencimiento\n");
+                printf("8. Necesita Receta (1: Sí, 0: No)\n");
+                printf("0. Cancelar\n");
+                printf("Ingrese una opción: ");
+                scanf("%d", &opcion);
+
+                char nuevoValor[100];
+                switch (opcion)
+                {
+                    case 1:
+                        printf("Nuevo nombre: ");
+                        scanf("%s", nuevoValor);
+                        strcpy(productoActual->producto->nombre, nuevoValor);
+                        break;
+                    case 2:
+                        printf("Nueva Descripción: ");
+                        scanf("%s", nuevoValor);
+                        strcpy(productoActual->producto->descripcion, nuevoValor);
+                        break;
+                    case 3:
+                        printf("Nueva Categoría: ");
+                        scanf("%s", nuevoValor);
+                        strcpy(productoActual->producto->categoria, nuevoValor);
+                        break;
+                    case 4:
+                        printf("Nuevo Proveedor: ");
+                        scanf("%s", nuevoValor);
+                        strcpy(productoActual->producto->proveedor, nuevoValor);
+                        break;
+                    case 5:
+                        printf("Nuevo Lote: ");
+                        scanf("%s", nuevoValor);
+                        strcpy(productoActual->producto->lote, nuevoValor);
+                        break;
+                    case 6:
+                        printf("Nuevo Precio Producto: ");
+                        int nuevoPrecio;
+                        scanf("%d", &nuevoPrecio);
+                        productoActual->producto->costo = nuevoPrecio;
+                        break;
+                    case 7:
+                        printf("Nueva Fecha De Vencimiento (dia-mes-año): ");
+                        scanf("%s", nuevoValor);
+                        strcpy(productoActual->producto->fechaVencimiento, nuevoValor);
+                        break;
+                    case 8:
+                        printf("Necesita receta (1: Sí, 0: No): ");
+                        int recetaSN;
+                        scanf("%d", &recetaSN);
+                        productoActual->producto->recetaSN = recetaSN;
+                        break;
+                    case 0:
+                        printf("Modificación cancelada.\n");
+                        break;
+                    default:
+                        printf("Opción inválida.\n");
+                }
+            } while (opcion != 0);
+
+            // Actualizar la información del producto modificado en todas las sucursales
+            struct Sucursales *sucursalActual = farmaSalud->headSucursales;
+            while (sucursalActual != NULL)
+            {
+                struct infoProducto *nuevoProducto = buscarProductoEnInventario(sucursalActual->inventario, codigoProducto);
+                if (nuevoProducto != NULL)
+                {
+                    *nuevoProducto = *productoActual->producto;
+                }
+                sucursalActual = sucursalActual->sig;
+            }
+
+            printf("Producto modificado exitosamente.\n");
+            return;
+        }
+        // Avanzar al siguiente producto en la lista
+        productoActual = productoActual->sig;
+    }
+    // Si no se encuentra el producto con el código especificado, mostrar un mensaje de error
+    printf("Producto no encontrado.\n");
+}
+
+
+
+/*
+ * Función para agregar una nueva sucursal a la lista de sucursales en FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura de datos de FarmaSalud.
+ * - Puntero a la nueva sucursal que se va a agregar.
+ */
+void agregarSucursal(struct FarmaSalud *farmaSalud, struct Sucursales *nuevaSucursal)
+{
+    // Obtener el puntero al inicio de la lista de sucursales
+    struct Sucursales *rec = farmaSalud->headSucursales;
+
+    // Verificar si la lista de sucursales está vacía
+    if (!farmaSalud->headSucursales)
+    {
+        // Si está vacía, la nueva sucursal se convierte en la primera de la lista
+        farmaSalud->headSucursales = nuevaSucursal;
+        return;
+    }
+
+    // Recorrer la lista hasta encontrar el último nodo
+    while (rec->sig != NULL)
+    {
+        rec = rec->sig;
+    }
+
+    // Conectar el último nodo de la lista al nuevo nodo
+    rec->sig = nuevaSucursal;
+
+    nuevaSucursal->ant = rec;
+}
+
+
+
+/*
+ * Función para buscar un producto en las sucursales de FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura de datos de FarmaSalud.
+ */
+void buscarProducto(struct FarmaSalud *farmaSalud)
+{
+    // Variable para almacenar el código del producto a buscar
+    char producto_buscado[50];
+
+    // Obtener el puntero al inicio de la lista de sucursales
+    struct Sucursales *sucursal = farmaSalud->headSucursales;
+
+    // Variable para indicar si se encontró el producto
+    int encontrado = 0;
+
+    // Solicitar al usuario el código del medicamento a buscar
+    printf("Ingrese el código del medicamento a buscar: ");
+    scanf("%s", producto_buscado);
+
+    // Recorrer la lista de sucursales
+    while (sucursal != NULL)
+    {
+        
+         struct stockProductos *stocks = sucursal->headStocks;
+         
+        while(stocks != NULL)
+        {
+            // Verificar si el código del producto en la sucursal actual coincide con el código buscado
+            if (strcmp(sucursal->headStocks->codigoMedicamento, producto_buscado) == 0)
+            {
+                // Si se encuentra el producto, imprimir la información del producto y la sucursal
+                printf("Producto encontrado:\n");
+                printf("Código: %s\n", producto_buscado);
+                printf("Stock disponible: %d\n", sucursal->headStocks->cantidadDisponible);
+                printf("Sucursal: %s, %s, %s\n", sucursal->direccion, sucursal->comuna, sucursal->region);
+                encontrado = 1;
+            }
+            stocks = stocks->sig;
+        }    
+        // Moverse a la siguiente sucursal
+        sucursal = sucursal->sig;
+    }
+
+    // Si no se encontró el producto en ninguna sucursal, imprimir un mensaje
+    if (encontrado == 0)
+    {
+        printf("Producto no encontrado.\n");
+    }
+}
+
+
+/*
+ * Función para listar todas las estructuras y datos de FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura de datos de FarmaSalud.
+ */
+void listarEstructurasYdatos(struct FarmaSalud *farmaSalud)
+{
+    printf("\n\n=== Listado de Estructuras y Datos ===\n\n");
+
+    // 1. Listar Productos Globales
+    printf("Productos Globales:\n");
+
+    struct Productos *producto = farmaSalud->headTotalProductos;
+
+    // Recorrer la lista de productos globales
+    while (producto != NULL) {
+        // Imprimir los detalles de cada producto
+        printf("  - Código: %s, Nombre: %s, Descripción: %s, Categoría: %s, Proveedor: %s, Lote: %s, Costo: %d, Fecha Vencimiento: %s, Receta: %s\n",
+               producto->producto->codigo, producto->producto->nombre, producto->producto->descripcion,
+               producto->producto->categoria, producto->producto->proveedor, producto->producto->lote,
+               producto->producto->costo, producto->producto->fechaVencimiento,
+               producto->producto->recetaSN ? "Sí" : "No");
+        producto = producto->sig;  // Moverse al siguiente producto
+    }
+
+    // 2. Listar Sucursales
+    printf("\nSucursales:\n");
+
+    struct Sucursales *sucursal = farmaSalud->headSucursales;
+    // Recorrer la lista de sucursales
+    while (sucursal != NULL)
+    {
+        // Imprimir los detalles de cada sucursal
+        printf("  - ID: %d, Dirección: %s, Comuna: %s, Región: %s\n",
+               sucursal->ID, sucursal->direccion, sucursal->comuna, sucursal->region);
+
+        // 2.1. Listar Stock de Productos por Sucursal
+        printf("    Stock de Productos:\n");
+        struct stockProductos *stock = sucursal->headStocks;
+
+        // Recorrer la lista de stock de productos
+        while (stock != NULL)
+        {
+            // Imprimir los detalles del stock de cada producto
+            printf("      - Código: %s, Cantidad: %d\n", stock->codigoMedicamento, stock->cantidadDisponible);
+
+            // 2.1.1. Listar Lotes por Producto
+            printf("        Lotes:\n");
+            struct controlLote *lote = stock->lotesProducto;
+            // Recorrer la lista de lotes de productos
+
+            while (lote != NULL)
+            {
+                // Imprimir los detalles de cada lote
+                printf("          - Lote: %s, Cantidad: %d, Fecha Vencimiento: %s\n",
+                       lote->lote, lote->cantidadDisponible, lote->fechaVencimiento);
+
+                lote = lote->sig;  // Moverse al siguiente lote
+            }
+            stock = stock->sig;  // Moverse al siguiente stock de producto
+        }
+
+        // 2.2. Listar Ventas por Sucursal (Boletas)
+        printf("    Ventas (Boletas):\n");
+        struct Ventas *boleta = sucursal->boletas;
+
+        // Recorrer la lista de boletas de ventas
+        while (boleta != NULL)
+        {
+            // Imprimir los detalles de cada boleta
+            printf("      - Número: %d, Fecha: %s, Monto Total: %d\n",
+                   boleta->numeroBoleta[0], boleta->fecha, boleta->montoTotal);
+
+            // 2.2.1. Listar Productos Vendidos por Boleta
+            printf("        Productos Vendidos:\n");
+
+            struct productosVendidos *vendido = boleta->vendidos;
+
+            // Recorrer la lista de productos vendidos
+            while (vendido != NULL) {
+                // Imprimir los detalles de cada producto vendido
+                printf("          - Código: %s, Cantidad: %d, Monto: %d\n",
+                       vendido->producto->codigo, vendido->cantidadVendida, vendido->montoProducto);
+
+                vendido = vendido->sig;  // Moverse al siguiente producto vendido
+            }
+            boleta = boleta->sig;  // Moverse a la siguiente boleta
+        }
+
+        sucursal = sucursal->sig;  // Moverse a la siguiente sucursal
+    }
+}
+
+
+/*
+ * Función para gestionar productos globales en la estructura FarmaSalud.
+ * Permite agregar, eliminar, buscar y modificar productos.
+ * Parámetros:
+ * - Puntero a la estructura de datos de FarmaSalud.
+ */
+void agregarEliminarBuscarProductos(struct FarmaSalud *farmaSalud)
+{
+    int opcion = 0;
+
+    // Mostrar menú hasta que se seleccione una opción válida
+    do {
+        printf("1. Agregar Producto Global\n");
+        printf("2. Eliminar Producto Global\n");
+        printf("3. Buscar Producto\n");
+        printf("4. Modificar Producto\n");
+        printf("5. Volver al menú principal\n");
+
+        scanf("%d", &opcion);
+    } while (opcion < 1 || opcion > 5);  // Repetir hasta que la opción esté en el rango 1-5
+
+    // Ejecutar la opción seleccionada
+    switch (opcion) {
+        case 1:
+        {
+            // Llamar a la función para agregar un producto global
+            agregarProductoGlobal(farmaSalud);
+        } break;
+
+        case 2:
+        {
+            // Llamar a la función para eliminar un producto global
+            char codigo[50];
+            printf("Ingrese el código del producto a eliminar: ");
+            scanf("%s", codigo);
+            eliminarProductoGlobal(farmaSalud, codigo);
+        } break;
+
+        case 3:
+        {
+            // Llamar a la función para buscar un producto
+            buscarProducto(farmaSalud);
+        } break;
+
+        case 4:
+        {
+            // Llamar a la función para modificar un producto
+            char codigoProducto[11];
+            printf("Ingrese el código del producto a modificar: ");
+            scanf("%10s", codigoProducto);
+            modificarProducto(farmaSalud, codigoProducto);
+        } break;
+
+        case 5:
+        {
+            // Volver al menú principal
+            return;
+        } break;
+    }
+}
+
+/*
+ * Función para agregar stock de un producto específico a una sucursal.
+ * Si el producto no está presente en el stock de la sucursal, se crea una nueva entrada.
+ * Parámetros:
+ * - Puntero a la sucursal.
+ * - Puntero a la informacion del del producto a agregar.
+ */
+void agregarStockjuntoProduct(struct Sucursales *sucursal, struct infoProducto *producto)
+{
+    int cantidad;
+
+    // Solicitar la cantidad a agregar
+    printf("Ingrese la cantidad a agregar: ");
+    scanf("%d", &cantidad);
+
+    // Buscar el stock del producto en la sucursal
+    struct stockProductos *stock = buscarStockProducto(sucursal->headStocks, producto);
+    if (stock == NULL)
+    {
+        // Si el producto no está en el stock de la sucursal
+        stock = (struct stockProductos*)malloc(sizeof(struct stockProductos));
+        if (stock == NULL)
+        {
+            perror("Error al asignar memoria para el stock");
+            exit(EXIT_FAILURE);
+        }
+        stock->codigoMedicamento = strdup(producto->codigo); // Duplicar el código del medicamento
+        stock->cantidadDisponible = 0;
+        stock->lotesProducto = NULL;
+        stock->sig = sucursal->headStocks;
+        sucursal->headStocks = stock;
+    }
+
+    // Agregar el lote al stock
+    agregarLote(stock, cantidad, producto->lote, producto->fechaVencimiento);
+    printf("Stock agregado correctamente.\n");
+}
+
+
+
+/*
+ * Función para crear una nueva sucursal y agregarla a la lista de sucursales en la estructura FarmaSalud.
+ * Parámetros:
+ * - Puntero a la estructura principal que contiene las sucursales.
+ */
+void CrearyAgregarSucursal(struct FarmaSalud *farmaSalud)
+{
+    // Asignar memoria para la nueva sucursal
+    struct Sucursales *nuevaSucursal = (struct Sucursales *) malloc(sizeof(struct Sucursales));
+    if (nuevaSucursal == NULL)
+    {
+        perror("Error al asignar memoria");
+        exit(EXIT_FAILURE);
+    }
+
+    // Solicitar y leer el ID de la sucursal
+    printf("Ingrese el ID de la sucursal: ");
+    scanf("%d", &nuevaSucursal->ID);
+
+    // Solicitar y leer la dirección de la sucursal
+    printf("Ingrese la dirección de la sucursal: ");
+
+    nuevaSucursal->direccion = (char*) malloc(50 * sizeof(char));  // Asignar memoria para la dirección
+
+    if (nuevaSucursal->direccion == NULL)
+    {
+        perror("Error al asignar memoria para la dirección");
+        free(nuevaSucursal);  // Liberar la memoria asignada para la sucursal
+        exit(EXIT_FAILURE);
+    }
+    scanf("%49s", nuevaSucursal->direccion);
+
+    // Solicitar y leer la comuna de la sucursal
+    printf("Ingrese la comuna de la sucursal: ");
+    nuevaSucursal->comuna = (char*) malloc(50 * sizeof(char));  // Asignar memoria para la comuna
+
+    if (nuevaSucursal->comuna == NULL)
+    {
+        perror("Error al asignar memoria para la comuna");
+        free(nuevaSucursal->direccion);  // Liberar la memoria asignada para la dirección
+        free(nuevaSucursal);  // Liberar la memoria asignada para la sucursal
+        exit(EXIT_FAILURE);
+    }
+    scanf("%49s", nuevaSucursal->comuna);
+
+    // Solicitar y leer la región de la sucursal
+    printf("Ingrese la región de la sucursal: ");
+    nuevaSucursal->region = (char*) malloc(50 * sizeof(char));  // Asignar memoria para la región
+
+    if (nuevaSucursal->region == NULL)
+    {
+        perror("Error al asignar memoria para la región");
+        free(nuevaSucursal->comuna);  // Liberar la memoria asignada para la comuna
+        free(nuevaSucursal->direccion);  // Liberar la memoria asignada para la dirección
+        free(nuevaSucursal);  // Liberar la memoria asignada para la sucursal
+        exit(EXIT_FAILURE);
+    }
+    scanf("%49s", nuevaSucursal->region);
+
+    // Inicializar las boletas y punteros de la nueva sucursal
+    nuevaSucursal->boletas = NULL;
+    nuevaSucursal->ant = nuevaSucursal->sig = NULL;
+
+    // Agregar la nueva sucursal a la lista de sucursales en la estructura FarmaSalud
+    agregarSucursal(farmaSalud, nuevaSucursal);
+}
+
+
+
+/*
+ * Función para registrar una venta en una sucursal existente o agregar una nueva sucursal si no existe.
+ * Parámetros:
+ * -Puntero a la estructura principal que contiene las sucursales.
+ */
+void menuNumeroCuatro(struct FarmaSalud *farmaSalud)
+{
+    int idBuscado, agregar; // Variables para almacenar el ID de la sucursal y la opción de agregar una nueva
+
+    struct Sucursales *nuevaSucursal = NULL; // Puntero para la nueva sucursal
+
+    // Solicitar el ID de la sucursal donde se quiere registrar la venta
+    printf("Por favor, ingrese el ID de la sucursal donde quiere registrar la venta: ");
+    scanf("%d", &idBuscado);
+
+    // Buscar la sucursal con el ID ingresado
+    struct Sucursales *sucursal = buscarSucursal(farmaSalud->headSucursales, idBuscado);
+
+    // Si la sucursal no existe, preguntar si desea agregarla
+    if (sucursal == NULL)
+    {
+        printf("No existe la sucursal. ¿Desea agregarla?\n");
+        printf("1. Sí\n");
+        printf("2. No\n");
+
+        scanf("%d", &agregar);
+
+        if (agregar == 1)
+        {
+            // Asignar memoria para la nueva sucursal
+            nuevaSucursal = (struct Sucursales *)malloc(sizeof(struct Sucursales));
+            if (nuevaSucursal == NULL)
+            {
+                perror("Error al asignar memoria");
+                exit(EXIT_FAILURE);
+            }
+
+            // Asignar memoria para los campos de la nueva sucursal
+            nuevaSucursal->direccion = malloc(50 * sizeof(char));
+
+            nuevaSucursal->comuna = malloc(50 * sizeof(char));
+
+            nuevaSucursal->region = malloc(50 * sizeof(char));
+
+            if (nuevaSucursal->direccion == NULL || nuevaSucursal->comuna == NULL || nuevaSucursal->region == NULL)
+            {
+                perror("Error al asignar memoria para la sucursal");
+                free(nuevaSucursal->direccion);
+                free(nuevaSucursal->comuna);
+                free(nuevaSucursal->region);
+                free(nuevaSucursal);
+                exit(EXIT_FAILURE);
+            }
+
+            // Solicitar y leer la dirección, comuna y región de la nueva sucursal
+            printf("Ingrese la dirección de la sucursal: ");
+            scanf("%49s", nuevaSucursal->direccion);
+
+            printf("Ingrese la comuna de la sucursal: ");
+            scanf("%49s", nuevaSucursal->comuna);
+
+            printf("Ingrese la región de la sucursal: ");
+            scanf("%49s", nuevaSucursal->region);
+
+            // Inicializar los campos de la nueva sucursal
+            nuevaSucursal->ID = idBuscado;
+            nuevaSucursal->headStocks = NULL;
+            nuevaSucursal->boletas = NULL;
+            nuevaSucursal->inventario = NULL;
+
+            // Agregar la nueva sucursal a la lista de sucursales
+            agregarSucursal(farmaSalud, nuevaSucursal);
+
+            // Asignar la nueva sucursal a la variable sucursal
+            sucursal = nuevaSucursal;
+        }
+        else
+        {
+            printf("Operación cancelada.\n");
+            return;
+        }
+    }
+
+    // Generar una boleta para la sucursal
+    sucursal->boletas = generarBoleta(sucursal);
+}
+
+
+/*
+ * Función para agregar un producto a una sucursal. Si la sucursal no existe, permite agregar una nueva sucursal.
+ * Parámetros:
+ * - Puntero a la estructura principal que contiene las sucursales.
+ */
+void menuNumeroSiete(struct FarmaSalud *farmaSalud)
+{
+    int idBuscado, SN; // Variables para almacenar el ID de la sucursal y la opción de agregar una nueva
+
+    struct Sucursales *nuevaSucursal = NULL; // Puntero para la nueva sucursal
+
+    // Solicitar el ID de la sucursal donde se quiere agregar el producto
+    printf("Por favor, ingrese el ID de la sucursal donde quiere agregar el producto/s: ");
+    scanf("%d", &idBuscado);
+
+    // Buscar la sucursal con el ID ingresado
+    struct Sucursales *sucursal = buscarSucursal(farmaSalud->headSucursales, idBuscado);
+
+    // Si la sucursal no existe, preguntar si desea agregarla
+    if (sucursal == NULL)
+    {
+        printf("No existe la sucursal.\n");
+        printf("Desea agregarla?:\n");
+        printf("(1).Sí---(2).No :");
+        scanf("%d", &SN);
+
+        if (SN == 1) {
+            // Asignar memoria para la nueva sucursal
+            nuevaSucursal = (struct Sucursales *)malloc(sizeof(struct Sucursales));
+
+            if (nuevaSucursal == NULL)
+            {
+                perror("Error al asignar memoria");
+                exit(EXIT_FAILURE);
+            }
+
+            // Asignar memoria para los campos de la nueva sucursal
+
+            nuevaSucursal->direccion = malloc(50 * sizeof(char));
+
+            nuevaSucursal->comuna = malloc(50 * sizeof(char));
+
+            nuevaSucursal->region = malloc(50 * sizeof(char));
+
+            if (nuevaSucursal->direccion == NULL || nuevaSucursal->comuna == NULL || nuevaSucursal->region == NULL)
+            {
+                perror("Error al asignar memoria para la sucursal");
+                free(nuevaSucursal->direccion);
+                free(nuevaSucursal->comuna);
+                free(nuevaSucursal->region);
+                free(nuevaSucursal);
+                exit(EXIT_FAILURE);
+            }
+
+            // Solicitar y leer la dirección, comuna y región de la nueva sucursal
+            printf("Ingrese la dirección de la sucursal: ");
+            scanf("%49s", nuevaSucursal->direccion);
+
+            printf("Ingrese la comuna de la sucursal: ");
+            scanf("%49s", nuevaSucursal->comuna);
+
+            printf("Ingrese la región de la sucursal: ");
+            scanf("%49s", nuevaSucursal->region);
+
+            // Inicializar los campos de la nueva sucursal
+            nuevaSucursal->ID = idBuscado;
+
+            nuevaSucursal->headStocks = NULL;
+
+            nuevaSucursal->boletas = NULL;
+
+            nuevaSucursal->inventario = NULL;
+
+            // Agregar la nueva sucursal a la lista de sucursales
+            agregarSucursal(farmaSalud, nuevaSucursal);
+
+            // Asignar la nueva sucursal a la variable sucursal
+            sucursal = nuevaSucursal;
+        }
+        else
+        {
+            printf("Operación cancelada.\n");
+            return;
+        }
+    }
+
+    // Asignar memoria para la estructura del producto
+    struct infoProducto *productoInfo = (struct infoProducto *)malloc(sizeof(struct infoProducto));
+    if (productoInfo == NULL)
+    {
+        perror("Error al asignar memoria");
+        exit(EXIT_FAILURE);
+    }
+
+    // Asignar memoria para los campos del producto
+    char *nuevoNombre = (char *)malloc(200 * sizeof(char));
+
+    char *nuevoCodigo = (char *)malloc(200 * sizeof(char));
+
+    char *nuevaDescripcion = (char *)malloc(200 * sizeof(char));
+
+    char *nuevaCategoria = (char *)malloc(200 * sizeof(char));
+
+    char *nuevaFechaVencimiento = (char *)malloc(200 * sizeof(char));
+
+    char *nuevoProveedor = (char *)malloc(200 * sizeof(char));
+
+    char *nuevoLote = (char *)malloc(200 * sizeof(char));
+
+    if (nuevoNombre == NULL || nuevoCodigo == NULL || nuevaDescripcion == NULL || nuevaCategoria == NULL ||
+        nuevaFechaVencimiento == NULL || nuevoProveedor == NULL || nuevoLote == NULL)
+    {
+        perror("Error al asignar memoria para el producto");
+        free(nuevoNombre);
+        free(nuevoCodigo);
+        free(nuevaDescripcion);
+        free(nuevaCategoria);
+        free(nuevaFechaVencimiento);
+        free(nuevoProveedor);
+        free(nuevoLote);
+        free(productoInfo);
+        exit(EXIT_FAILURE);
+    }
+
+    int costo; // Variable para almacenar el costo del producto
+
+    int recetaSN; // Variable para almacenar si el producto necesita receta
+
+    // Solicitar y leer los datos del producto
+    printf("Ingrese el nombre del Producto: ");
+    scanf("%49s", nuevoNombre);
+
+    int longitud;
+    do {
+        printf("Ingrese el código del producto (10 caracteres): ");
+        scanf("%10s", nuevoCodigo);
+        longitud = strlen(nuevoCodigo);
+        if (longitud != 10)
+        {
+            printf("Ingrese un código válido de 10 caracteres\n");
+        }
+    } while (longitud != 10);
+
+    printf("Ingrese descripción del producto: ");
+    scanf("%s", nuevaDescripcion);
+
+    printf("Ingrese la categoría del Producto: ");
+    scanf("%s", nuevaCategoria);
+
+    printf("Ingrese fecha de vencimiento del producto (dia-mes-año): ");
+    scanf("%10s", nuevaFechaVencimiento);
+
+    printf("Ingrese el Nombre del proveedor: ");
+    scanf("%s", nuevoProveedor);
+
+    printf("Ingrese lote: ");
+    scanf("%19s", nuevoLote);
+
+    printf("El producto necesita receta? Ingrese 1 (sí) o 2 (no): ");
+    scanf("%d", &recetaSN);
+
+    printf("Ingrese el costo del producto: ");
+    scanf("%d", &costo);
+
+    // Asignar los valores ingresados a la estructura del producto
+    productoInfo->codigo = nuevoCodigo;
+    productoInfo->nombre = nuevoNombre;
+    productoInfo->costo = costo;
+    productoInfo->proveedor = nuevoProveedor;
+    productoInfo->recetaSN = recetaSN;
+    productoInfo->categoria = nuevaCategoria;
+    productoInfo->lote = nuevoLote;
+    productoInfo->descripcion = nuevaDescripcion;
+    productoInfo->fechaVencimiento = nuevaFechaVencimiento;
+
+    // Insertar el producto en el inventario de la sucursal
+    sucursal->inventario = insertarProductoInventario(sucursal->inventario, productoInfo);
+
+    // Agregar el stock del producto a la sucursal
+    agregarStockjuntoProduct(sucursal, productoInfo);
+}
+
+
+
+
+/*
+ * Función para imprimir las boletas  de  una sucursal.
+ * Parámetros:
+ * - Puntero a la sucursal.
+ */
+void imprimirBoletasSucursal(struct Sucursales *sucursal)
+        {
+    // Verificar si la sucursal o las boletas son nulas
+    if (!sucursal || !sucursal->boletas)
+    {
+        printf("No hay boletas registradas en esta sucursal.\n");
+        return;
+    }
+
+    // Inicializar un puntero para recorrer la lista de boletas
+    struct Ventas *boleta = sucursal->boletas;
+
+    // Recorrer hasta encontrar la última boleta
+    while (boleta->sig != NULL)
+    {
+        boleta = boleta->sig; // Encontrar la última (más reciente) boleta
+    }
+
+    // Imprimir la información de la última boleta
+    printf("\n=== Boleta de Venta ===\n");
+    printf("Sucursal: %s\n", boleta->direccion);
+    printf("Número de Boleta: %d\n", boleta->numeroBoleta[0]);
+    printf("Fecha: %s\n", boleta->fecha);
+    printf("---------------------\n");
+
+    // Inicializar un puntero para recorrer la lista de productos vendidos
+    struct productosVendidos *vendido = boleta->vendidos;
+
+    // Recorrer e imprimir cada producto vendido
+    while (vendido != NULL) {
+        printf("%s x %d - $%d\n", vendido->producto->nombre, vendido->cantidadVendida, vendido->montoProducto);
+        vendido = vendido->sig;
+    }
+
+    // Imprimir el total de la boleta
+    printf("---------------------\n");
+    printf("Total: $%d\n\n", boleta->montoTotal);
+}
+
+void agregarStock(struct FarmaSalud *farmaSalud)
+{
+    int idSucursal, cantidad;
+    char *codigoProducto , lote[20], fechaVencimiento[11];
+
+    printf("Ingrese el ID de la sucursal: ");
+    scanf("%d", &idSucursal);
+
+    struct Sucursales *sucursal = buscarSucursal(farmaSalud->headSucursales, idSucursal);
+    if (!sucursal)
+    {
+        printf("Sucursal no encontrada.\n");
+        return;
+    }
+
+    codigoProducto = (char*)malloc(11 * sizeof(char));
+
+    printf("Ingrese el código del producto: ");
+    scanf("%10s", codigoProducto);
+
+    struct infoProducto *producto = buscarProductoEnInventario(sucursal->inventario, codigoProducto);
+    if (producto == NULL)
+    {
+        printf("Producto no encontrado en el inventario de la sucursal.\n");
+        return;
+    }
+
+    printf("Ingrese la cantidad a agregar: ");
+    scanf("%d", &cantidad);
+
+    printf("Ingrese el número de lote: ");
+    scanf("%19s", lote);
+
+    printf("Ingrese la fecha de vencimiento (DD-MM-AAAA): ");
+    scanf("%10s", fechaVencimiento);
+
+    struct stockProductos *stock = buscarStockProducto(sucursal->headStocks, producto);
+    if (!stock)
+    {
+
+        stock = (struct stockProductos*)malloc(sizeof(struct stockProductos));
+        stock->codigoMedicamento = strdup(codigoProducto);
+        stock->cantidadDisponible = 0;
+        stock->lotesProducto = NULL;
+        stock->sig = sucursal->headStocks;
+        sucursal->headStocks = stock;
+    }
+
+    agregarLote(stock, cantidad, lote, fechaVencimiento);
+    printf("Stock agregado correctamente.\n");
+}
+
+/*
+ * Función para generar un informe de ventas por periodo.
+ * Parámetros:
+ * - Puntero a la estructura principal que contiene todas las sucursales.
+ * - Cadena que representa la fecha de inicio del periodo (formato: "dd-mm-aaaa").
+ * - Cadena que representa la fecha de término del periodo (formato: "dd-mm-aaaa").
+ */
+void generarInformeVentasPorPeriodo(struct FarmaSalud *farmaSalud, char *fechaInicio, char *fechaTermino)
+        {
+    // Verificar si no hay sucursales registradas
+    if (farmaSalud->headSucursales == NULL)
+    {
+        printf("No Hay Sucursales Registradas \n");
+        return;
+    }
+
+    // Puntero para recorrer las sucursales
+    struct Sucursales *sucursalActual = farmaSalud->headSucursales;
+
+    // Recorrer cada sucursal
+    while (sucursalActual != NULL)
+    {
+        // Puntero para recorrer las boletas de la sucursal actual
+        struct Ventas *boletaActual = sucursalActual->boletas;
+
+        // Recorrer cada boleta
+        while (boletaActual != NULL)
+        {
+            // Verificar si la fecha de la boleta está dentro del rango de fechas especificado
+            if (strcmp(boletaActual->fecha, fechaInicio) >= 0 && strcmp(boletaActual->fecha, fechaTermino) <= 0)
+            {
+                // Imprimir la dirección de la sucursal y la boleta
+                printf("\n Sucursal: %s\n", sucursalActual->direccion);
+                imprimirBoleta(boletaActual);
+            }
+            // Avanzar a la siguiente boleta
+            boletaActual = boletaActual->sig;
+        }
+
+        // Avanzar a la siguiente sucursal
+        sucursalActual = sucursalActual->sig;
+    }
+}
+
+
+
+/*
+ * Función para mostrar el menú de opciones y manejar la lógica de las elecciones del usuario.
+ * Parámetros:
+ * - Puntero a la estructura principal que contiene todas las sucursales y productos.
+ */
+void menuOpciones(struct FarmaSalud *farmaSalud)
+{
+    int opcion = 0;
+
+    // Mostrar el menú hasta que el usuario elija una opción válida
+    do {
+        printf("\n Menu Opciones: \n");
+        printf("Ingrese una opcion del menu\n");
+        printf("1. Menu Agregar, Eliminar, Modificar o Buscar Productos\n");
+        printf("2. Agregar Sucursal, Region o Ciudad\n");
+        printf("3. Verificar Alertas\n");
+        printf("4. Registrar Venta \n");
+        printf("5. Listar estructuras y datos utilizados\n");
+        printf("6. Generar ordenes de compra\n");
+        printf("7. Agregar Producto a Sucursal\n");
+        printf("8. Agregar stock\n");
+        printf("9. Imprimir boletas\n");
+        printf("10. Generar Informe De Ventas por Periodo\n");
+        printf("11. Producto más Vendido del Mes en Sucursal\n");
+        printf("12. Producto Más Vendido del Mes\n");
+
+        scanf("%d", &opcion);
+    } while (opcion < 1 || opcion > 12);
+
+    // Manejo de la opción seleccionada por el usuario
+    switch (opcion) {
+        case 1: {
+            agregarEliminarBuscarProductos(farmaSalud);
+        } break;
+
+        case 2: {
+            CrearyAgregarSucursal(farmaSalud);
+        } break;
+
+        case 3: {
+            listarEstructurasYdatos(farmaSalud);
+        } break;
+
+        case 4: {
+            menuNumeroCuatro(farmaSalud);
+        } break;
+
+        case 5: {
+            listarEstructurasYdatos(farmaSalud);
+        } break;
+
+        case 6: {
+            generarOrdenesCompra(farmaSalud);
+        } break;
+
+        case 7: {
+            menuNumeroSiete(farmaSalud);
+        } break;
+
+        case 8: {
+            agregarStock(farmaSalud);
+        } break;
+
+        case 9: {
+            int idSucursal;
+            printf("Ingrese el ID de la sucursal: ");
+            scanf("%d", &idSucursal);
+
+            struct Sucursales *sucursal = buscarSucursal(farmaSalud->headSucursales, idSucursal);
+            if (sucursal) {
+                imprimirBoletasSucursal(sucursal);
+            } else {
+                printf("Sucursal no encontrada.\n");
+            }
+        } break;
+
+        case 10: {
+            char fechaInicio[11], fechaTermino[11];
+
+            printf("Ingrese la fecha de inicio (DD-MM-AAAA): ");
+            scanf("%10s", fechaInicio);
+
+            printf("Ingrese la fecha de término (DD-MM-AAAA): ");
+            scanf("%10s", fechaTermino);
+
+            generarInformeVentasPorPeriodo(farmaSalud, fechaInicio, fechaTermino);
+        } break;
+
+        case 11:
+        {
+            int idSucursal;
+            printf("Ingrese el ID de la sucursal: ");
+            scanf("%d", &idSucursal);
+
+            struct Sucursales *sucursal = buscarSucursal(farmaSalud->headSucursales, idSucursal);
+            if (sucursal) {
+                productoMasVendidoSucursal(sucursal ,idSucursal);
+            } else {
+                printf("Sucursal no encontrada.\n");
+            }
+        } break;
+
+        case 12:
+        {
+            productoMasVendidoMes(farmaSalud);
+        } break;
+
+        default:
+            break;
+    }
+}
+
+
+int main()
+{
+
+    struct FarmaSalud farmaSalud;
+    farmaSalud.headSucursales = NULL;
+    farmaSalud.headTotalProductos = NULL;
+    int opcion = 1;
+
+    while (opcion != 0)
+    {
+
+
+        menuOpciones(&farmaSalud);
+        printf("desea realizar otra operacion 1(si) 0(no)");
+        scanf("%d",&opcion);
+    }
+
+    return 0;
+}
